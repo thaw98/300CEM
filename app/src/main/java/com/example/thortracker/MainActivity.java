@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 
@@ -58,10 +59,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,TaskLoadedCallback {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, TaskLoadedCallback {
 
     private static final int REQUEST_CODE_PERMISIION = 10101;
     private static final int ERROR_CODE = 1111;
+    boolean allReadyAnimate=false;
     boolean mLocationPermisisionGranter;
 
     LatLng SearchPlacesLatLong;
@@ -80,8 +82,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     Button btnDirection;
     private Polyline currentPolyline;
-    private List<Polyline> polylines=null;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,9 +99,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onLocationResult(LocationResult locationResult) {
                 if (locationResult == null) {
+                    Toast.makeText(MainActivity.this, "Its Null", Toast.LENGTH_SHORT).show();
                     return;
                 } else {
                     Location location = locationResult.getLastLocation();
+                    GotoMyLocation(location.getLatitude(),location.getLongitude());
                     Toast.makeText(MainActivity.this, location.getLatitude() + "", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -112,9 +114,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         btnDirection.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                //add direction when cilci
-                new FetchURL(MainActivity.this).execute(getUrl(myLocationMarker.getPosition(), destinationMarker.getPosition(), "driving"), "driving");
-
+                //add direction when click
+                 new FetchURL(MainActivity.this).execute(getUrl(myLocationMarker.getPosition(), destinationMarker.getPosition(), "driving"), "driving");
 
             }
         });
@@ -123,7 +124,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         current.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                getCurrentLocation();
+                //getCurrentLocation();
+                getLocationUpdate();
             }
         });
         inputSearch = findViewById(R.id.inputSearch);
@@ -133,9 +135,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onClick(View v) {
 
-
                 String address = inputSearch.getText().toString();
-
                 geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
                 try {
                     List<Address> addressList = geocoder.getFromLocationName(address, 1);
@@ -150,6 +150,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
         });
+
         if (SearchPlacesLatLong != null) {
             // Toast.makeText(this, SearchPlacesLatLong.latitude, Toast.LENGTH_SHORT).show();
         }
@@ -213,7 +214,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Address address = newListAddress.get(0);
                         destinationMarker = new MarkerOptions();
                         destinationMarker.position(latLng);
-                        destinationMarker.title("Your Selected Place");
+                        destinationMarker.title("Your Selected Destination Place");
                         destinationMarker.draggable(true);
                         searchMm = gMap.addMarker(destinationMarker);
                     }
@@ -231,6 +232,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (myLocationMm != null) {
             myLocationMm.remove();
         }
+
         LatLng latLng = new LatLng(lat, lng);
         CameraUpdate cameraUpdate1 = CameraUpdateFactory.newLatLngZoom(latLng, 10f);
         myLocationMarker = new MarkerOptions();
@@ -238,12 +240,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         myLocationMarker.title("I am Here");
         myLocationMarker.draggable(false);
         myLocationMm = gMap.addMarker(myLocationMarker);
-        gMap.animateCamera(cameraUpdate1);
+        if(!allReadyAnimate){
+            gMap.animateCamera(cameraUpdate1);
+            allReadyAnimate=true;
+
+        }
+
     }
 
     private void getLocationUpdate() {
         LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         locationRequest.setInterval(5000);
         locationRequest.setFastestInterval(2000);
 
