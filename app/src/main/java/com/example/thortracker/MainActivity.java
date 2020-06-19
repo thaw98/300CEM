@@ -15,11 +15,20 @@ import android.location.Location;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 
+import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.directions.route.AbstractRouting;
+import com.directions.route.Route;
+import com.directions.route.RouteException;
+import com.directions.route.Routing;
+import com.directions.route.RoutingListener;
+import com.example.thortracker.directionhelpers.FetchURL;
+import com.example.thortracker.directionhelpers.TaskLoadedCallback;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -36,8 +45,11 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.material.snackbar.Snackbar;
 
 
 import java.io.IOException;
@@ -46,7 +58,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,TaskLoadedCallback {
 
     private static final int REQUEST_CODE_PERMISIION = 10101;
     private static final int ERROR_CODE = 1111;
@@ -63,7 +75,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private EditText inputSearch;
     private ImageView btnSearch;
     Geocoder geocoder;
-    Marker searchMm,myLocationMm;
+    Marker searchMm, myLocationMm;
+    MarkerOptions myLocationMarker, destinationMarker;
+
+    Button btnDirection;
+    private Polyline currentPolyline;
+    private List<Polyline> polylines=null;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +106,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
         };
+
+
+        btnDirection = findViewById(R.id.btnDirection);
+        btnDirection.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //add direction when cilci
+                new FetchURL(MainActivity.this).execute(getUrl(myLocationMarker.getPosition(), destinationMarker.getPosition(), "driving"), "driving");
+
+
+            }
+        });
+
+
         current.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -109,6 +141,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     List<Address> addressList = geocoder.getFromLocationName(address, 1);
                     if (addressList.size() > 0) {
                         Address address1 = addressList.get(0);
+
+                        //after change  when marker change
                         GotoSearchLocation(address1.getLatitude(), address1.getLongitude());
                     }
                 } catch (IOException e) {
@@ -148,12 +182,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         LatLng latLng = new LatLng(lat, lng);
         CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 10f);
-        MarkerOptions markerOptions1 = new MarkerOptions();
-        markerOptions1.position(latLng);
-        markerOptions1.title("Your Selected Place");
-        markerOptions1.draggable(true);
+        destinationMarker = new MarkerOptions();
+        destinationMarker.position(latLng);
+        destinationMarker.title("Your Selected Place");
+        destinationMarker.draggable(true);
 
-        searchMm = gMap.addMarker(markerOptions1);
+        searchMm = gMap.addMarker(destinationMarker);
         gMap.animateCamera(cameraUpdate);
 
         gMap.setOnMarkerDragListener(new GoogleMap.OnMarkerDragListener() {
@@ -177,11 +211,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                     if (newListAddress.size() > 0) {
                         Address address = newListAddress.get(0);
-                        MarkerOptions markerOptions2 = new MarkerOptions();
-                        markerOptions2.position(latLng);
-                        markerOptions2.title("Your Selected Place");
-                        markerOptions2.draggable(true);
-                        searchMm = gMap.addMarker(markerOptions2);
+                        destinationMarker = new MarkerOptions();
+                        destinationMarker.position(latLng);
+                        destinationMarker.title("Your Selected Place");
+                        destinationMarker.draggable(true);
+                        searchMm = gMap.addMarker(destinationMarker);
                     }
 
                 } catch (IOException e) {
@@ -199,11 +233,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         LatLng latLng = new LatLng(lat, lng);
         CameraUpdate cameraUpdate1 = CameraUpdateFactory.newLatLngZoom(latLng, 10f);
-        MarkerOptions markerOptions3 = new MarkerOptions();
-        markerOptions3.position(latLng);
-        markerOptions3.title("I am Here");
-        markerOptions3.draggable(false);
-        myLocationMm = gMap.addMarker(markerOptions3);
+        myLocationMarker = new MarkerOptions();
+        myLocationMarker.position(latLng);
+        myLocationMarker.title("I am Here");
+        myLocationMarker.draggable(false);
+        myLocationMm = gMap.addMarker(myLocationMarker);
         gMap.animateCamera(cameraUpdate1);
     }
 
@@ -233,6 +267,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // LocationSettingsRequest.Builder builder=new LocationSettingsRequest.Builder().addLocationRequest()
     }
+
     private void initMap() {
         if (isSericesOK()) {
             if (PermissionOK()) {
@@ -287,6 +322,23 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    private String getUrl(LatLng origin, LatLng dest, String directionMode) {
+        // Origin of route
+        String str_origin = "origin=" + origin.latitude + "," + origin.longitude;
+        // Destination of route
+        String str_dest = "destination=" + dest.latitude + "," + dest.longitude;
+        // Mode
+        String mode = "mode=" + directionMode;
+        // Building the parameters to the web service
+        String parameters = str_origin + "&" + str_dest + "&" + mode;
+        // Output format
+        String output = "json";
+        // Building the url to the web service
+        String url = "https://maps.googleapis.com/maps/api/directions/" + output + "?" + parameters + "&key=" + "AIzaSyCgIcgrjTpjptdGCh-r3V3GfMygtpDGDzI";
+        return url;
+    }
+
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -323,9 +375,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mapView.onSaveInstanceState(outState);
     }
 
+
     @Override
     public void onLowMemory() {
         super.onLowMemory();
         mapView.onLowMemory();
+    }
+
+
+    @Override
+    public void onTaskDone(Object... values) {
+        if (currentPolyline != null)
+            currentPolyline.remove();
+        currentPolyline = gMap.addPolyline((PolylineOptions) values[0]);
     }
 }
