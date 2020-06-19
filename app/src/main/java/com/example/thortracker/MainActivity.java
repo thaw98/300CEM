@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private EditText inputSearch;
     private ImageView btnSearch;
     Geocoder geocoder;
-    Marker mm;
+    Marker searchMm,myLocationMm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -131,7 +131,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                     if (task.isSuccessful()) {
                         Location location = task.getResult();
-                        GotoSearchLocation(location.getLatitude(), location.getLongitude());
+                        GotoMyLocation(location.getLatitude(), location.getLongitude());
 
                     } else {
                         Toast.makeText(MainActivity.this, task.getException().toString(), Toast.LENGTH_SHORT).show();
@@ -143,17 +143,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void GotoSearchLocation(final double lat, double lng) {
-        if (mm != null) {
-            mm.remove();
+        if (searchMm != null) {
+            searchMm.remove();
         }
         LatLng latLng = new LatLng(lat, lng);
         CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 10f);
-        MarkerOptions markerOptions = new MarkerOptions();
-        markerOptions.position(latLng);
-        markerOptions.title("Your Selected Place");
-        markerOptions.draggable(true);
+        MarkerOptions markerOptions1 = new MarkerOptions();
+        markerOptions1.position(latLng);
+        markerOptions1.title("Your Selected Place");
+        markerOptions1.draggable(true);
 
-        mm = gMap.addMarker(markerOptions);
+        searchMm = gMap.addMarker(markerOptions1);
         gMap.animateCamera(cameraUpdate);
 
         gMap.setOnMarkerDragListener(new GoogleMap.OnMarkerDragListener() {
@@ -168,8 +168,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             @Override
             public void onMarkerDragEnd(Marker marker) {
-                if (mm != null) {
-                    mm.remove();
+                if (searchMm != null) {
+                    searchMm.remove();
                 }
                 LatLng latLng = marker.getPosition();
                 try {
@@ -177,11 +177,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                     if (newListAddress.size() > 0) {
                         Address address = newListAddress.get(0);
-                        MarkerOptions markerOptions = new MarkerOptions();
-                        markerOptions.position(latLng);
-                        markerOptions.title("Your Selected Place");
-                        markerOptions.draggable(true);
-                        mm = gMap.addMarker(markerOptions);
+                        MarkerOptions markerOptions2 = new MarkerOptions();
+                        markerOptions2.position(latLng);
+                        markerOptions2.title("Your Selected Place");
+                        markerOptions2.draggable(true);
+                        searchMm = gMap.addMarker(markerOptions2);
                     }
 
                 } catch (IOException e) {
@@ -190,6 +190,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             }
         });
+    }
+
+
+    private void GotoMyLocation(final double lat, double lng) {
+        if (myLocationMm != null) {
+            myLocationMm.remove();
+        }
+        LatLng latLng = new LatLng(lat, lng);
+        CameraUpdate cameraUpdate1 = CameraUpdateFactory.newLatLngZoom(latLng, 10f);
+        MarkerOptions markerOptions3 = new MarkerOptions();
+        markerOptions3.position(latLng);
+        markerOptions3.title("I am Here");
+        markerOptions3.draggable(false);
+        myLocationMm = gMap.addMarker(markerOptions3);
+        gMap.animateCamera(cameraUpdate1);
     }
 
     private void getLocationUpdate() {
