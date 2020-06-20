@@ -73,16 +73,19 @@
         app:layout_constraintEnd_toStartOf="@+id/current"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <Button
-        android:id="@+id/btnDetail"
+    <TextView
+        android:id="@+id/textDetail"
         android:layout_width="0dp"
-        android:layout_height="35dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="8dp"
-        android:background="@drawable/btn_bg_sq"
         android:text="Time Duration "
-        android:visibility="gone"
+        android:textColor="@color/colorPrimary"
+        android:gravity="center"
+        android:textStyle="bold"
+        android:textSize="24sp"
+        android:visibility="visible"
         app:layout_constraintBottom_toTopOf="@+id/btnDirection"
         app:layout_constraintEnd_toStartOf="@+id/current"
         app:layout_constraintStart_toStartOf="parent" />

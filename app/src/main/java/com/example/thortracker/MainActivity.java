@@ -7,11 +7,15 @@ import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.PersistableBundle;
@@ -21,6 +25,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.directions.route.AbstractRouting;
@@ -51,6 +56,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.snackbar.Snackbar;
+import com.google.maps.android.SphericalUtil;
 
 
 import java.io.IOException;
@@ -63,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final int REQUEST_CODE_PERMISIION = 10101;
     private static final int ERROR_CODE = 1111;
-    boolean allReadyAnimate=false;
+    boolean allReadyAnimate = false;
     boolean mLocationPermisisionGranter;
 
     LatLng SearchPlacesLatLong;
@@ -79,8 +85,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     Geocoder geocoder;
     Marker searchMm, myLocationMm;
     MarkerOptions myLocationMarker, destinationMarker;
+    LatLng currentLatln, destinationLatLn;
 
     Button btnDirection;
+    TextView textDetail;
+    double distance = 0.0;
     private Polyline currentPolyline;
 
     @Override
@@ -89,7 +98,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_main);
 
         mapView = findViewById(R.id.mapView);
+        textDetail = findViewById(R.id.textDetail);
         current = findViewById(R.id.current);
+        textDetail.setVisibility(View.GONE);
         initMap();
         mapView.getMapAsync(this);
         mapView.onCreate(savedInstanceState);
@@ -99,12 +110,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onLocationResult(LocationResult locationResult) {
                 if (locationResult == null) {
-                    Toast.makeText(MainActivity.this, "Its Null", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Location not found", Toast.LENGTH_SHORT).show();
                     return;
                 } else {
                     Location location = locationResult.getLastLocation();
-                    GotoMyLocation(location.getLatitude(),location.getLongitude());
-                    Toast.makeText(MainActivity.this, location.getLatitude() + "", Toast.LENGTH_SHORT).show();
+                    currentLatln = new LatLng(location.getLatitude(), location.getLongitude());
+                    GotoMyLocation(location.getLatitude(), location.getLongitude());
                 }
             }
         };
@@ -115,7 +126,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onClick(View view) {
                 //add direction when click
-                 new FetchURL(MainActivity.this).execute(getUrl(myLocationMarker.getPosition(), destinationMarker.getPosition(), "driving"), "driving");
+                new FetchURL(MainActivity.this).execute(getUrl(myLocationMarker.getPosition(), destinationMarker.getPosition(), "driving"), "driving");
+                distance = SphericalUtil.computeDistanceBetween(currentLatln, destinationLatLn);
+                if (distance != 0.0) {
+                    textDetail.setVisibility(View.VISIBLE);
+                    textDetail.setText("Distance: " + distance / 1000 + "KM");
+                } else {
+                    textDetail.setVisibility(View.GONE);
+                }
 
             }
         });
@@ -125,7 +143,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onClick(View v) {
                 //getCurrentLocation();
-                getLocationUpdate();
+                if (isGpsEnabled()) {
+                    getLocationUpdate();
+                } else {
+                    Toast.makeText(MainActivity.this, "Please Enable GPS Location", Toast.LENGTH_SHORT).show();
+                }
+
+
             }
         });
         inputSearch = findViewById(R.id.inputSearch);
@@ -135,25 +159,46 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onClick(View v) {
 
-                String address = inputSearch.getText().toString();
-                geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
-                try {
-                    List<Address> addressList = geocoder.getFromLocationName(address, 1);
-                    if (addressList.size() > 0) {
-                        Address address1 = addressList.get(0);
-
-                        //after change  when marker change
-                        GotoSearchLocation(address1.getLatitude(), address1.getLongitude());
+                if (isNetworkEnabled()) {
+                    String address = inputSearch.getText().toString();
+                    geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
+                    try {
+                        List<Address> addressList = geocoder.getFromLocationName(address, 1);
+                        if (addressList.size() > 0) {
+                            Address address1 = addressList.get(0);
+                            //after change  when marker change
+                            GotoSearchLocation(address1.getLatitude(), address1.getLongitude());
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } else {
+                    Toast.makeText(MainActivity.this, "Please Turn on Internet Connection", Toast.LENGTH_SHORT).show();
                 }
+
+
             }
         });
 
         if (SearchPlacesLatLong != null) {
             // Toast.makeText(this, SearchPlacesLatLong.latitude, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    boolean isNetworkEnabled() {
+        ConnectivityManager manager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = manager.getActiveNetworkInfo();
+        if (networkInfo != null) {
+            return true;
+        }
+        return false;
+    }
+
+    boolean isGpsEnabled() {
+        LocationManager locationManage = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+
+        return locationManage.isProviderEnabled(LocationManager.GPS_PROVIDER);
+
     }
 
     private void getCurrentLocation() {
@@ -182,6 +227,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             searchMm.remove();
         }
         LatLng latLng = new LatLng(lat, lng);
+        destinationLatLn = latLng;
         CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 10f);
         destinationMarker = new MarkerOptions();
         destinationMarker.position(latLng);
@@ -211,6 +257,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     List<Address> newListAddress = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
 
                     if (newListAddress.size() > 0) {
+                        destinationLatLn = latLng;
                         Address address = newListAddress.get(0);
                         destinationMarker = new MarkerOptions();
                         destinationMarker.position(latLng);
@@ -240,9 +287,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         myLocationMarker.title("I am Here");
         myLocationMarker.draggable(false);
         myLocationMm = gMap.addMarker(myLocationMarker);
-        if(!allReadyAnimate){
+        if (!allReadyAnimate) {
             gMap.animateCamera(cameraUpdate1);
-            allReadyAnimate=true;
+            allReadyAnimate = true;
 
         }
 
@@ -276,7 +323,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void initMap() {
-        if (isSericesOK()) {
+        if (isServicesOK()) {
             if (PermissionOK()) {
                 Toast.makeText(this, "Map is Ready", Toast.LENGTH_SHORT).show();
             } else {
@@ -289,7 +336,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean isSericesOK() {
+    private boolean isServicesOK() {
         GoogleApiAvailability apiAvailability = GoogleApiAvailability.getInstance();
         int result = apiAvailability.isGooglePlayServicesAvailable(this);
         if (result == ConnectionResult.SUCCESS) {
